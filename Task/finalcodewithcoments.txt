@@ -1,0 +1,90 @@
+import mysql.connector
+import smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+mydb = mysql.connector.connect(
+user='root1', 
+password='1979',
+host='127.0.0.1',
+database='my_database'
+)
+#prisijungiam prie duomenu bazes
+mycursor = mydb.cursor()
+#sukurtas kursorius leidzia pasiekti duomenis is bazes
+#mycursor.execute ivykdo uzklausa
+mycursor.execute("SELECT  COUNT(*) FROM aircraft INNER JOIN model  INNER JOIN companies INNER JOIN country_codes WHERE SDF_COC_002 = ('Europe') AND SDF_COC_003 = ('T') AND  (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY) AND aircraft.MDL_AUTO_KEY = model.MDL_AUTO_KEY AND companies.COC_AUTO_KEY = country_codes.COC_AUTO_KEY -- AND  country_codes.SDF_COC_002 = 'Asia' -- AND (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY)-- -- AND  country_codes.SDF_COC_002 = 'Europe'  ORDER BY FIELD(country_codes.SDF_COC_002, 'Europe') DESC,  FIELD(country_codes.SDF_COC_003, 'T', 'F' ) ASC ;")
+countEU = mycursor.fetchone() # pasiima pries tai atliktos uzklausos rezultata
+mycursor.execute("SELECT  COUNT(*) FROM aircraft INNER JOIN model  INNER JOIN companies INNER JOIN country_codes WHERE SDF_COC_002 = ('Europe') AND SDF_COC_003 = ('F') AND  (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY) AND aircraft.MDL_AUTO_KEY = model.MDL_AUTO_KEY AND companies.COC_AUTO_KEY = country_codes.COC_AUTO_KEY -- AND (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY)   ORDER BY FIELD(country_codes.SDF_COC_002, 'Europe') DESC,  FIELD(country_codes.SDF_COC_003, 'T', 'F' ) ASC ;")
+countNEU = mycursor.fetchone() # pasiima pries tai atliktos uzklausos rezultata
+mycursor.execute("SELECT  COUNT(*) FROM aircraft INNER JOIN model  INNER JOIN companies INNER JOIN country_codes WHERE SDF_COC_002 != ('Europe') AND SDF_COC_003 = ('F') AND  (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY) AND aircraft.MDL_AUTO_KEY = model.MDL_AUTO_KEY AND companies.COC_AUTO_KEY = country_codes.COC_AUTO_KEY -- AND (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY)   ORDER BY FIELD(country_codes.SDF_COC_002, 'Europe') DESC,  FIELD(country_codes.SDF_COC_003, 'T', 'F' ) ASC ;")
+countOUT= mycursor.fetchone() # pasiima pries tai atliktos uzklausos rezultata
+
+#iraso pasiimta reiksme int formatu
+countEU = int(countEU[0]) #EUropos ir Es saliu sk
+countNEU = int(countNEU[0]) #Europos ir Ne ES saliu sk
+countOUT = int(countOUT[0]) #Ne ES
+x = 0
+ #kintamasis x skirtas fiksuoti eiluciu skaiciu ir pagal ji skirsto i lenteles
+mycursor.execute("SELECT  aircraft.TAIL_NUMBER, model.MODEL_NUMBER, model.DESCRIPTION ,companies.COMPANY_NAME,country_codes.CODE, country_codes.COUNTRY_NAME FROM aircraft INNER JOIN model  INNER JOIN companies INNER JOIN country_codes WHERE  aircraft.MDL_AUTO_KEY = model.MDL_AUTO_KEY AND companies.COC_AUTO_KEY = country_codes.COC_AUTO_KEY AND (aircraft.ACT_AUTO_KEY = country_codes.COC_AUTO_KEY) ORDER BY FIELD(country_codes.SDF_COC_002, 'Europe') DESC, FIELD(country_codes.SDF_COC_003, 'T', 'F' ) ASC ;")
+#paskutinis selectas surikiuoja salis taip kad pirma butu europos ir ES ,veliau ne ES ir ne Europos
+myresult = mycursor.fetchall() #issaugo visas eilutes rezultato lenteles
+#aprasomas string tipo kintamasis i kuri veliau bus issaugoti duomenys:
+mystring = """\
+<html>
+  <body>
+    %s <br> %s
+  </body>
+</html>
+"""
+# aprasome pirmos ir antros lenteles pradzia ir stulpelio pavadinimus
+htmlt2="<table border =\"1\" > "
+htmlt2+=("<tr><th>" + "TAIL_NUMBER" + "</th><th>" + "MODEL_NUMBER" + "</th><th>" + " MODEL_DESCRIPTION" + "</th><th>" + "OWNER_COMPANY_NAME"+"</th><th>"+ "COMPANY_COUNTRY_CODE " + "</th><th>"+"COMPANY_COUNTRY_NAME" + "</th></tr>")
+htmlt1="<table border =\"1\" > "
+htmlt1+=("<tr><th>" + "TAIL_NUMBER" + "</th><th>" + "MODEL_NUMBER" + "</th><th>" + " MODEL_DESCRIPTION" + "</th><th>" + "OWNER_COMPANY_NAME"+"</th><th>"+ "COMPANY_COUNTRY_CODE" + "</th><th>" + "COMPANY_COUNTRY_NAME" + "</th></tr>")
+for value in myresult:
+    arrez=value[0:] 
+    x=x+1 #skaiciuoja eil sk   
+    aircraftrow = [arrez] #eilute iraso i masyva
+    for a in aircraftrow: #ir pereina su ciklu per kiekviena masyvo elementa
+        
+        if x <= countEU:        
+          # pridedam reiksmes i pirma eilute su atitinkama spalva kol salys yra is europos(maziau arba lygu uz ju kiek )
+            htmlt1+=("<tr bgcolor=\"#87CEFA\" ><th>" + a[0] + "</th><th>" + a[1] + "</th><th>" + a[2] + "</th><th>" + a[3]+"</th><th>"+ a[4] +"</th><th>"+ a[5] + "</th></tr>")
+        elif x > (countEU) and x <= (countEU+countNEU):
+            htmlt1+=("<tr bgcolor=\"#ff4d4d\" ><th>" + a[0] + "</th><th>" + a[1] + "</th><th>" + a[2] + "</th><th>" + a[3]+"</th><th>"+ a[4] + "</th><th>" + a[5] +  "</th></tr>")
+            if x == (countEU+countNEU): #jeigu x reiksme lygi europos saliu sk uzdarom lentele pries tai irase eilutes reiksme
+                htmlt1+=("</table>")
+               # pirmos lenteles reiksme issaugojome htmlt1
+        elif x > (countEU+countNEU):   #jeigu x daugiau uz ES kieki tai bus ne ES salis
+            htmlt2+=("<tr><th>" + a[0] + "</th><th>" + a[1] + "</th><th>" + a[2] + "</th><th>" + a[3]+"</th><th>"+ a[4] + "</th><th>" + a[5]+ "</th></tr>")
+            if x == (countEU+countNEU+countOUT):   
+                htmlt2+=("</table>")
+                html = mystring % (htmlt1,htmlt2)
+              # antros lenteles reiksmes issaugojoms htmlt2
+		# html1 ir html2 reiksmes iterpeme i mystring ir viska issaugojome html kintamajame
+mydb.close() #uzdarom prisijungima
+#print html isspausdintu visa html koda i ekrana
+#atidarom html formato faila, paruosta irasymui
+Html_file= open("aircrafts_tables.html","w") 
+Html_file.write(html) 
+Html_file.close() 
+#irasom html koda i html formato faila ir issaugome viska,gautame kode turi susidaryti 2 skirtingos lenteles pagal reikalavimus
+#------------smtp email-----------------------------------
+#sender_email = "raimond.kalnins@gmail.com"
+#password = input("Iveskite slaptazodi ir spauskite Enter:")
+#message = MIMEMultipart("alternative")
+#message["Subject"] = "multipart test"
+#message["To"] = receiver_email
+#part1 = MIMEText(html, "html")
+
+# prideda HTML dali i MIMEMultipart message
+#message.attach(part1)
+
+# turetu sukurti saugu rysi su serveriu ir issiusti email (bet nesiuncia)
+#context = ssl.create_default_context()
+#with smtplib.SMTP_SSL("smtp.gmail.com", 465, context=context) as server:
+#   server.login(sender_email, password)
+#   server.sendmail(
+#       sender_email, receiver_email, message.as_string()
+#   )  
+      

@@ -1,0 +1,10 @@
+1. Create a database from provided datasets (4 tables: AIRCRAFT, MODEL, COMPANIES, COUTRY_CODES). See attached files. Use your preferred DBMS.
+2. Write a Python script which:
+	2.1. Connects to Database
+	2.2. Extracts info about aircrafts (TAIL_NUMBER, MODEL_NUMBER, MODEL_DESCRIPTION, OWNER_COMPANY_NAME, COMPANY_COUNTRY_CODE, COMPANY_COUNTRY_NAME).
+	2.3. Composes a HTML email with 2 seperate tables in content:
+		2.3.1. A first table with aircrafts which belong to European companies. If country belongs to European Union, table row should have ligth-blue background. If country is not from within EU, table row should be with light-red background. For filtering EU countries use SDF_COC_003 column from COUTRY_CODES table: T = EU country, F = nonEU country.
+		2.3.2. A second table with aircrafts from outside Europe.
+	2.4. Sends an email through SMTP server. Use your internet provider's server or any free tool (e.g.: https://mailtrap.io/).
+	2.5. Comment all your Python code.
+3. Upload your Python script to GitHub and make it publicly available.
